@@ -66,6 +66,15 @@ private enum ProviderMacroIntrospection {
         return nil
     }
 
+    // SwiftSyntax 509 does not infer that DeclGroupSyntax conforms to DeclSyntaxProtocol
+    // through an opaque parameter, so keep a concrete overload for member macros.
+    static func typeDecl(from declaration: some DeclGroupSyntax) -> (decl: DeclGroupSyntax, name: String)? {
+        if let decl = declaration.as(StructDeclSyntax.self) { return (decl, decl.name.text) }
+        if let decl = declaration.as(ClassDeclSyntax.self) { return (decl, decl.name.text) }
+        if let decl = declaration.as(EnumDeclSyntax.self) { return (decl, decl.name.text) }
+        return nil
+    }
+
     static func hasStaticDescriptor(in decl: DeclGroupSyntax) -> Bool {
         for member in decl.memberBlock.members {
             guard let varDecl = member.decl.as(VariableDeclSyntax.self) else { continue }
