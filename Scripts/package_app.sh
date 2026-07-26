@@ -4,7 +4,8 @@ CONF=${1:-release}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
-swift build -c "$CONF" --arch arm64
+ARCH=${ARCH:-x86_64}
+swift build -c "$CONF" --arch "$ARCH"
 
 APP="$ROOT/CodexBar.app"
 rm -rf "$APP"
@@ -37,7 +38,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-cp ".build/$CONF/CodexBar" "$APP/Contents/MacOS/CodexBar"
+cp ".build/$ARCH-apple-macosx/$CONF/CodexBar" "$APP/Contents/MacOS/CodexBar"
 chmod +x "$APP/Contents/MacOS/CodexBar"
 
 if [[ -f "$ICON_TARGET" ]]; then
