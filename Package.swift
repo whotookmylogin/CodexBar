@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 5.9
 import CompilerPluginSupport
 import Foundation
 import PackageDescription
@@ -11,13 +11,13 @@ let sweetCookieKitDependency: Package.Dependency = FileManager.default.fileExist
 let package = Package(
     name: "CodexBar",
     platforms: [
-        .macOS(.v14),
+        .macOS(.v13),
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.8.1"),
         .package(url: "https://github.com/steipete/Commander", from: "0.2.0"),
         .package(url: "https://github.com/apple/swift-log", from: "1.8.0"),
-        .package(url: "https://github.com/apple/swift-syntax", from: "600.0.0"),
+        .package(url: "https://github.com/apple/swift-syntax", from: "509.0.0"),
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "1.10.0"),
         sweetCookieKitDependency,
     ],
