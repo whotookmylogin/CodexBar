@@ -6,8 +6,8 @@ private enum WatchdogExitCode {
     static let spawnFailed: Int32 = 70
 }
 
-private nonisolated(unsafe) var globalChildPID: pid_t = 0
-private nonisolated(unsafe) var globalShouldTerminate: Int32 = 0
+private var globalChildPID: pid_t = 0
+private var globalShouldTerminate: Int32 = 0
 
 private func usageAndExit() -> Never {
     fputs("Usage: CodexBarClaudeWatchdog -- <binary> [args...]\n", stderr)

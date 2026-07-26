@@ -42,7 +42,7 @@ public enum CodexBarLog {
     }
 
     private static let lock = NSLock()
-    private nonisolated(unsafe) static var isBootstrapped = false
+    private static var isBootstrapped = false
 
     public static func bootstrapIfNeeded(_ config: Configuration) {
         self.lock.lock()
