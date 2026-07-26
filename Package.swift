@@ -14,8 +14,6 @@ let package = Package(
         .macOS(.v13),
     ],
     dependencies: [
-        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.8.1"),
-
         .package(url: "https://github.com/apple/swift-log", exact: "1.5.4"),
         .package(url: "https://github.com/apple/swift-syntax", from: "509.0.0"),
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "1.10.0"),
@@ -67,7 +65,6 @@ let package = Package(
             .executableTarget(
                 name: "CodexBar",
                 dependencies: [
-                    .product(name: "Sparkle", package: "Sparkle"),
                     .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
                     "CodexBarMacroSupport",
                     "CodexBarCore",
@@ -79,7 +76,7 @@ let package = Package(
                 swiftSettings: [
                     // Opt into Swift 6 strict concurrency (approachable migration path).
                     .enableUpcomingFeature("StrictConcurrency"),
-                    .define("ENABLE_SPARKLE"),
+
                 ]),
             .executableTarget(
                 name: "CodexBarWidget",
