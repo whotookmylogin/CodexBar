@@ -15,7 +15,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.8.1"),
-        .package(url: "https://github.com/steipete/Commander", exact: "0.1.0"),
+
         .package(url: "https://github.com/apple/swift-log", from: "1.8.0"),
         .package(url: "https://github.com/apple/swift-syntax", from: "509.0.0"),
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "1.10.0"),
@@ -45,19 +45,9 @@ let package = Package(
                 dependencies: [
                     "CodexBarMacros",
                 ]),
-            .executableTarget(
-                name: "CodexBarCLI",
-                dependencies: [
-                    "CodexBarCore",
-                    .product(name: "Commander", package: "Commander"),
-                ],
-                path: "Sources/CodexBarCLI",
-                swiftSettings: [
-                    .enableUpcomingFeature("StrictConcurrency"),
-                ]),
         .testTarget(
             name: "CodexBarLinuxTests",
-            dependencies: ["CodexBarCore", "CodexBarCLI"],
+            dependencies: ["CodexBarCore"],
             path: "TestsLinux",
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
@@ -109,8 +99,14 @@ let package = Package(
 
         targets.append(.testTarget(
             name: "CodexBarTests",
-            dependencies: ["CodexBar", "CodexBarCore", "CodexBarCLI"],
+            dependencies: ["CodexBar", "CodexBarCore"],
             path: "Tests",
+            exclude: [
+                "CodexBarTests/CLIArgumentParsingTests.swift",
+                "CodexBarTests/CLISnapshotTests.swift",
+                "CodexBarTests/CLIProviderSelectionTests.swift",
+                "CodexBarTests/CLIWebFallbackTests.swift",
+            ],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
                 .enableExperimentalFeature("SwiftTesting"),
