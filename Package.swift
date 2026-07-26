@@ -15,7 +15,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.8.1"),
-        .package(url: "https://github.com/steipete/Commander", from: "0.2.0"),
+        .package(url: "https://github.com/steipete/Commander", exact: "0.1.0"),
         .package(url: "https://github.com/apple/swift-log", from: "1.8.0"),
         .package(url: "https://github.com/apple/swift-syntax", from: "509.0.0"),
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "1.10.0"),
