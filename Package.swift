@@ -1,10 +1,10 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 5.9
 import PackageDescription
 
 let package = Package(
     name: "CodexBar",
     platforms: [
-        .macOS(.v15),
+        .macOS(.v13),
     ],
     targets: [
         .executableTarget(
