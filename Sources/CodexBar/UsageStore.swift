@@ -11,6 +11,7 @@ final class UsageStore: ObservableObject {
 
     private let settings: SettingsStore
     private var timerTask: Task<Void, Never>?
+    private var bootTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     private var notifiedLow: Set<ProviderID> = []
     private var refreshGeneration = 0
@@ -18,11 +19,13 @@ final class UsageStore: ObservableObject {
     init(settings: SettingsStore) {
         self.settings = settings
         bindSettings()
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            await self?.refresh()
-            self?.startTimer()
-            self?.requestNotificationPermissionIfNeeded()
+        bootTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard let self, !Task.isCancelled else { return }
+            await self.refresh()
+            guard !Task.isCancelled else { return }
+            self.startTimer()
+            self.requestNotificationPermissionIfNeeded()
         }
     }
 
@@ -31,7 +34,6 @@ final class UsageStore: ObservableObject {
     }
 
     func refresh() async {
-        // Allow a newer refresh to interrupt an in-flight one by using a generation token.
         refreshGeneration += 1
         let generation = refreshGeneration
         isRefreshing = true
@@ -45,11 +47,11 @@ final class UsageStore: ObservableObject {
         var next = snapshots
         var errors: [String] = []
 
-        // Sequential fetches avoid URLSession cancellation races on menu-bar cold start.
         for id in providers {
             if generation != refreshGeneration { return }
             do {
-                let snap = try await Self.fetch(id)
+                // Detached so menu-bar SwiftUI task cancellation cannot kill network I/O.
+                let snap = try await Self.fetchUncancellable(id)
                 if generation != refreshGeneration { return }
                 next[id] = snap
                 evaluateLowQuota(snap)
@@ -72,6 +74,19 @@ final class UsageStore: ObservableObject {
         snapshots = next
         lastGlobalError = errors.isEmpty ? nil : errors.joined(separator: " | ")
         Self.writeDebugSnapshot(next)
+    }
+
+    private static func fetchUncancellable(_ id: ProviderID) async throws -> ProviderSnapshot {
+        try await withCheckedThrowingContinuation { continuation in
+            Task.detached(priority: .utility) {
+                do {
+                    let snap = try await Self.fetch(id)
+                    continuation.resume(returning: snap)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     private static func writeDebugSnapshot(_ snapshots: [ProviderID: ProviderSnapshot]) {
@@ -126,7 +141,9 @@ final class UsageStore: ObservableObject {
     }
 
     private func bindSettings() {
+        // dropFirst: avoid starting the timer before the boot refresh finishes.
         settings.$refreshFrequency
+            .dropFirst()
             .sink { [weak self] _ in self?.startTimer() }
             .store(in: &cancellables)
 
@@ -144,6 +161,7 @@ final class UsageStore: ObservableObject {
         timerTask = Task.detached(priority: .utility) { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+                if Task.isCancelled { return }
                 await self?.refresh()
             }
         }
@@ -176,6 +194,7 @@ final class UsageStore: ObservableObject {
     }
 
     deinit {
+        bootTask?.cancel()
         timerTask?.cancel()
     }
 }

@@ -179,7 +179,7 @@ private func showAbout() {
     NSApp.activate(ignoringOtherApps: true)
     let alert = NSAlert()
     alert.alertStyle = .informational
-    alert.messageText = "CodexBar 0.2.4 (macOS 13)"
+    alert.messageText = "CodexBar 0.2.5 (macOS 13)"
     alert.informativeText = """
     Multi-provider fork for Intel macOS 13.
     Providers: Codex · Claude · OpenRouter · Grok
