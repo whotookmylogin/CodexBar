@@ -192,17 +192,33 @@ struct CodexBarApp: App {
                 isStale: snap?.error != nil)
         }
 
-        // Separate status items when not merged
-        ForEach(ProviderID.allCases) { id in
-            MenuBarExtra(isInserted: separateBinding(id)) {
-                ProviderMenuContent(provider: id, store: store, settings: settings)
-            } label: {
-                let snap = store.snapshot(for: id)
-                IconView(
-                    snapshot: snap,
-                    badge: id.shortLabel,
-                    isStale: snap?.error != nil)
-            }
+        // Separate status items when not merged (explicit Scenes; ForEach is not a Scene on macOS 13)
+        MenuBarExtra(isInserted: separateBinding(.codex)) {
+            ProviderMenuContent(provider: .codex, store: store, settings: settings)
+        } label: {
+            let snap = store.snapshot(for: .codex)
+            IconView(snapshot: snap, badge: ProviderID.codex.shortLabel, isStale: snap?.error != nil)
+        }
+
+        MenuBarExtra(isInserted: separateBinding(.claude)) {
+            ProviderMenuContent(provider: .claude, store: store, settings: settings)
+        } label: {
+            let snap = store.snapshot(for: .claude)
+            IconView(snapshot: snap, badge: ProviderID.claude.shortLabel, isStale: snap?.error != nil)
+        }
+
+        MenuBarExtra(isInserted: separateBinding(.openrouter)) {
+            ProviderMenuContent(provider: .openrouter, store: store, settings: settings)
+        } label: {
+            let snap = store.snapshot(for: .openrouter)
+            IconView(snapshot: snap, badge: ProviderID.openrouter.shortLabel, isStale: snap?.error != nil)
+        }
+
+        MenuBarExtra(isInserted: separateBinding(.grok)) {
+            ProviderMenuContent(provider: .grok, store: store, settings: settings)
+        } label: {
+            let snap = store.snapshot(for: .grok)
+            IconView(snapshot: snap, badge: ProviderID.grok.shortLabel, isStale: snap?.error != nil)
         }
 
         Settings {
