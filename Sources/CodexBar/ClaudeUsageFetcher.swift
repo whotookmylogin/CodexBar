@@ -24,6 +24,7 @@ enum ClaudeUsageFetcher {
             config.waitsForConnectivity = true
             return config
         }())
+        defer { session.finishTasksAndInvalidate() }
 
         let data: Data
         let response: URLResponse
@@ -33,8 +34,6 @@ enum ClaudeUsageFetcher {
             // One retry on cancellation/transient failures (menu-bar cold start race).
             try await Task.sleep(nanoseconds: 400_000_000)
             (data, response) = try await session.data(for: request)
-        } finally {
-            session.finishTasksAndInvalidate()
         }
         guard let http = response as? HTTPURLResponse else {
             throw UsageError.network("Claude OAuth: invalid response")
