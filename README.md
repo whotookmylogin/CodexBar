@@ -1,43 +1,32 @@
-# CodexBar
+# CodexBar (macOS 13 Intel fork)
 
-Tiny macOS 15+ menu bar app that shows how much Codex usage you have left (5‑hour + weekly windows) and when each window resets. No Dock icon, minimal UI, dynamic bar icon in the menu bar.
+Menu bar usage meters for AI coding limits on **macOS 13 / Intel**.
 
-- Reads the newest `rollout-*.jsonl` in `~/.codex/sessions/...` and extracts the latest `token_count` event to get `used_percent`, `window_minutes`, and `resets_at`.
-- Displays both windows (5h / weekly), last-updated time, your ChatGPT account email + plan (decoded locally from `~/.codex/auth.json`), and a configurable refresh cadence.
-- Horizontal bar icon: top bar = 5h window, bottom hairline = weekly window. Filled portion shows “percent left.” Turns dim when the last read failed.
-- CLI-only: does not hit chatgpt.com or browsers; keeps tokens on-device.
+This is **not** a full port of upstream CodexBar 0.45+ (macOS 14+, Swift 6.2, 60+ providers).
+It starts from the original lightweight CodexBar app and adds the highest-value modern features that still compile on Swift 5.9 / macOS 13.
 
-## Quick start
+## Providers
+- **Codex** — local `~/.codex/sessions` token_count events + auth plan/email
+- **Claude** — OAuth usage API via `~/.claude/.credentials.json`
+- **OpenRouter** — credits + key limits via `OPENROUTER_API_KEY` or `~/.config/codexbar/config.json`
+- **Grok** — identity from `~/.grok/auth.json` + local session signals (billing % needs macOS 14 full app / browser session)
+
+## Modern features included
+- Multi-provider menu with switcher
+- Separate status items or merged icon mode
+- Relative reset countdowns
+- Refresh presets: Manual / 1 / 2 / 5 / 15 / 30 min
+- Low-quota notifications
+- Launch at login (best-effort; unsigned builds may need manual Login Items)
+- Provider enable toggles
+
+## Build (on the Intel Mac)
 ```bash
-swift build -c release          # or debug for development
-./Scripts/package_app.sh        # builds CodexBar.app in-place
+ARCH=x86_64 ./Scripts/package_app.sh release
 open CodexBar.app
+# or install:
+cp -R CodexBar.app /Applications/
 ```
 
-Requirements:
-- Codex CLI ≥ 0.55.0 installed and logged in (`codex --version`).
-- At least one Codex prompt this session so `token_count` events exist (otherwise you’ll see “No usage yet”).
-
-## Refresh cadence
-Menu → “Refresh every …” with presets: Manual, 1 min, 2 min (default), 5 min. Manual still allows “Refresh now.”
-
-## Notarization & signing
-Same flow as Trimmy:
-```bash
-export APP_STORE_CONNECT_API_KEY_P8="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-export APP_STORE_CONNECT_KEY_ID="ABC123XYZ"
-export APP_STORE_CONNECT_ISSUER_ID="00000000-0000-0000-0000-000000000000"
-./Scripts/sign-and-notarize.sh
-```
-Outputs `CodexBar-0.1.0.zip` ready to ship. Adjust `APP_IDENTITY` in the script if needed.
-
-## How account info is read
-`~/.codex/auth.json` is decoded locally (JWT only) to show your email + plan (Pro/Plus/Business). Nothing is sent anywhere.
-
-## Limitations / edge cases
-- If the newest session log has no `token_count` yet, you’ll see “No usage yet.” Run one Codex prompt and refresh.
-- If Codex changes the event schema, percentages may fail to parse; the menu will show the error string.
-- Only arm64 build is scripted; add `--arch x86_64` if you want a universal binary.
-
-## Changelog
-See [CHANGELOG.md](CHANGELOG.md).
+## Branch
+`compat/macos-13-modern`
