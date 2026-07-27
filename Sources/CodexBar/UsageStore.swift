@@ -17,7 +17,6 @@ final class UsageStore: ObservableObject {
     init(settings: SettingsStore) {
         self.settings = settings
         bindSettings()
-        // Defer first refresh off the cold-launch path so MenuBarExtra can mount.
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 300_000_000)
             await self?.refresh()
@@ -60,9 +59,9 @@ final class UsageStore: ObservableObject {
                     errors.append("\(id.displayName): \(message)")
                     next[id] = ProviderSnapshot(
                         id: id,
-                        windows: next[id]?.windows ?? [],
+                        windows: [],
                         accountLine: next[id]?.accountLine,
-                        detailLines: next[id]?.detailLines ?? [],
+                        detailLines: [],
                         updatedAt: Date(),
                         error: message)
                     notifiedLow.remove(id)
@@ -70,6 +69,45 @@ final class UsageStore: ObservableObject {
             }
             snapshots = next
             lastGlobalError = errors.isEmpty ? nil : errors.joined(separator: " | ")
+            Self.writeDebugSnapshot(next)
+        }
+    }
+
+    private static func writeDebugSnapshot(_ snapshots: [ProviderID: ProviderSnapshot]) {
+        let dir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".codexbar", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        var payload: [String: Any] = [
+            "updatedAt": ISO8601DateFormatter().string(from: Date()),
+        ]
+        var providers: [String: Any] = [:]
+        for (id, snap) in snapshots {
+            var windows: [[String: Any]] = []
+            for w in snap.windows {
+                var row: [String: Any] = [
+                    "id": w.id,
+                    "title": w.title,
+                    "usedPercent": w.window.usedPercent,
+                    "remainingPercent": w.window.remainingPercent,
+                ]
+                if let m = w.window.windowMinutes { row["windowMinutes"] = m }
+                if let r = w.window.resetsAt {
+                    row["resetsAt"] = ISO8601DateFormatter().string(from: r)
+                }
+                if let c = w.window.resetCountdown { row["countdown"] = c }
+                windows.append(row)
+            }
+            var entry: [String: Any] = [
+                "detailLines": snap.detailLines,
+                "updatedAt": ISO8601DateFormatter().string(from: snap.updatedAt),
+                "windows": windows,
+            ]
+            if let a = snap.accountLine { entry["accountLine"] = a }
+            if let e = snap.error { entry["error"] = e }
+            providers[id.rawValue] = entry
+        }
+        payload["providers"] = providers
+        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: dir.appendingPathComponent("last-refresh.json"), options: .atomic)
         }
     }
 

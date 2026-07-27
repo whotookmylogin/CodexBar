@@ -90,7 +90,7 @@ final class SettingsStore: ObservableObject {
             let set = Set(arr.compactMap(ProviderID.init(rawValue:)))
             self.enabledProviders = set.isEmpty ? [.codex] : set
         } else {
-            self.enabledProviders = [.codex, .claude]
+            self.enabledProviders = [.codex]
         }
 
         if let raw = userDefaults.string(forKey: Keys.selectedProvider),
