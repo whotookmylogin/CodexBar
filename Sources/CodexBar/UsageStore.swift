@@ -17,9 +17,13 @@ final class UsageStore: ObservableObject {
     init(settings: SettingsStore) {
         self.settings = settings
         bindSettings()
-        Task { await refresh() }
-        startTimer()
-        requestNotificationPermissionIfNeeded()
+        // Defer first refresh off the cold-launch path so MenuBarExtra can mount.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            await self?.refresh()
+            self?.startTimer()
+            self?.requestNotificationPermissionIfNeeded()
+        }
     }
 
     func snapshot(for id: ProviderID) -> ProviderSnapshot? {

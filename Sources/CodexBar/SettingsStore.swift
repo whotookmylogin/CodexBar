@@ -101,15 +101,13 @@ final class SettingsStore: ObservableObject {
             self.selectedProvider = .codex
         }
 
-        self.mergeIcons = userDefaults.object(forKey: Keys.mergeIcons) as? Bool ?? true
-        self.lowQuotaNotifications = userDefaults.object(forKey: Keys.lowQuotaNotifications) as? Bool ?? true
+        // Merge-icons is unused in the single-status-item UI; keep the key for prefs compatibility.
+        self.mergeIcons = true
+        self.lowQuotaNotifications = userDefaults.object(forKey: Keys.lowQuotaNotifications) as? Bool ?? false
         let threshold = userDefaults.object(forKey: Keys.lowQuotaThreshold) as? Double ?? 20
         self.lowQuotaThreshold = threshold
+        // Do not register launch-at-login during init; only on explicit user toggle.
         self.launchAtLogin = userDefaults.bool(forKey: Keys.launchAtLogin)
-
-        if self.launchAtLogin {
-            applyLaunchAtLogin(true)
-        }
     }
 
     func setProvider(_ id: ProviderID, enabled: Bool) {
