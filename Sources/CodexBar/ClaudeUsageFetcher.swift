@@ -11,13 +11,31 @@ enum ClaudeUsageFetcher {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.timeoutInterval = 30
+        request.timeoutInterval = 45
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         request.setValue("claude-code/2.1.0", forHTTPHeaderField: "User-Agent")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let session = URLSession(configuration: {
+            let config = URLSessionConfiguration.ephemeral
+            config.timeoutIntervalForRequest = 45
+            config.timeoutIntervalForResource = 60
+            config.waitsForConnectivity = true
+            return config
+        }())
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            // One retry on cancellation/transient failures (menu-bar cold start race).
+            try await Task.sleep(nanoseconds: 400_000_000)
+            (data, response) = try await session.data(for: request)
+        } finally {
+            session.finishTasksAndInvalidate()
+        }
         guard let http = response as? HTTPURLResponse else {
             throw UsageError.network("Claude OAuth: invalid response")
         }
@@ -56,9 +74,9 @@ enum ClaudeUsageFetcher {
 
         var details: [String] = []
         if let extra = decoded.extraUsage {
-            if let used = extra.used, let limit = extra.limit {
+            if let used = extra.usedValue, let limit = extra.limitValue {
                 details.append(String(format: "Extra usage: $%.2f / $%.2f", used, limit))
-            } else if let used = extra.used {
+            } else if let used = extra.usedValue {
                 details.append(String(format: "Extra usage: $%.2f", used))
             }
         }
@@ -205,7 +223,8 @@ private struct OAuthUsageWindow: Decodable {
     }
 
     func asRateWindow() -> RateWindow? {
-        let used = usedPercent ?? utilization.map { $0 <= 1.0 ? $0 * 100.0 : $0 }
+        // Claude OAuth usage returns utilization as a percent (e.g. 1.0 = 1%, 4.0 = 4%).
+        let used = usedPercent ?? utilization
         guard let used else { return nil }
         return RateWindow(
             usedPercent: used,
@@ -217,6 +236,20 @@ private struct OAuthUsageWindow: Decodable {
 private struct OAuthExtraUsage: Decodable {
     let used: Double?
     let limit: Double?
+    let usedCredits: Double?
+    let monthlyLimit: Double?
+    let isEnabled: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case used
+        case limit
+        case usedCredits = "used_credits"
+        case monthlyLimit = "monthly_limit"
+        case isEnabled = "is_enabled"
+    }
+
+    var usedValue: Double? { used ?? usedCredits }
+    var limitValue: Double? { limit ?? monthlyLimit }
 }
 
 private func parseISO8601(_ string: String?) -> Date? {

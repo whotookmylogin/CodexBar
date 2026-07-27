@@ -13,6 +13,7 @@ final class UsageStore: ObservableObject {
     private var timerTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     private var notifiedLow: Set<ProviderID> = []
+    private var refreshGeneration = 0
 
     init(settings: SettingsStore) {
         self.settings = settings
@@ -30,47 +31,47 @@ final class UsageStore: ObservableObject {
     }
 
     func refresh() async {
-        guard !isRefreshing else { return }
+        // Allow a newer refresh to interrupt an in-flight one by using a generation token.
+        refreshGeneration += 1
+        let generation = refreshGeneration
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer {
+            if generation == refreshGeneration {
+                isRefreshing = false
+            }
+        }
 
         let providers = Array(settings.enabledProviders)
-        await withTaskGroup(of: (ProviderID, Result<ProviderSnapshot, Error>).self) { group in
-            for id in providers {
-                group.addTask {
-                    do {
-                        let snap = try await Self.fetch(id)
-                        return (id, .success(snap))
-                    } catch {
-                        return (id, .failure(error))
-                    }
-                }
-            }
+        var next = snapshots
+        var errors: [String] = []
 
-            var next = snapshots
-            var errors: [String] = []
-            for await (id, result) in group {
-                switch result {
-                case let .success(snap):
-                    next[id] = snap
-                    evaluateLowQuota(snap)
-                case let .failure(error):
-                    let message = error.localizedDescription
-                    errors.append("\(id.displayName): \(message)")
-                    next[id] = ProviderSnapshot(
-                        id: id,
-                        windows: [],
-                        accountLine: next[id]?.accountLine,
-                        detailLines: [],
-                        updatedAt: Date(),
-                        error: message)
-                    notifiedLow.remove(id)
-                }
+        // Sequential fetches avoid URLSession cancellation races on menu-bar cold start.
+        for id in providers {
+            if generation != refreshGeneration { return }
+            do {
+                let snap = try await Self.fetch(id)
+                if generation != refreshGeneration { return }
+                next[id] = snap
+                evaluateLowQuota(snap)
+            } catch {
+                if generation != refreshGeneration { return }
+                let message = error.localizedDescription
+                errors.append("\(id.displayName): \(message)")
+                next[id] = ProviderSnapshot(
+                    id: id,
+                    windows: [],
+                    accountLine: next[id]?.accountLine,
+                    detailLines: [],
+                    updatedAt: Date(),
+                    error: message)
+                notifiedLow.remove(id)
             }
-            snapshots = next
-            lastGlobalError = errors.isEmpty ? nil : errors.joined(separator: " | ")
-            Self.writeDebugSnapshot(next)
         }
+
+        if generation != refreshGeneration { return }
+        snapshots = next
+        lastGlobalError = errors.isEmpty ? nil : errors.joined(separator: " | ")
+        Self.writeDebugSnapshot(next)
     }
 
     private static func writeDebugSnapshot(_ snapshots: [ProviderID: ProviderSnapshot]) {
