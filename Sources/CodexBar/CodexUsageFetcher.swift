@@ -84,20 +84,10 @@ enum CodexUsageFetcher {
         // 2) { timestamp, payload:{ type:token_count, rate_limits:{...} } }
         let payload = (root["payload"] as? [String: Any]) ?? root
         let type = payload["type"] as? String
-        guard type == "token_count" || type == "event_msg" else {
-            // Some lines nest type under payload only; already handled.
-            // Accept payload.rate_limits even if type missing when rate_limits present.
-            if payload["rate_limits"] == nil { return nil }
-            // continue
-            _ = type
+        // Prefer explicit token_count; otherwise accept any payload that carries rate_limits.
+        if type != "token_count", payload["rate_limits"] == nil {
+            return nil
         }
-
-        // If outer type is event_msg, real type is payload.type
-        if type == "event_msg" {
-            // shouldn't happen with assignment above; keep for safety
-        }
-        let effectiveType = (payload["type"] as? String) ?? type
-        guard effectiveType == "token_count" || payload["rate_limits"] != nil else { return nil }
 
         guard let rate = payload["rate_limits"] as? [String: Any] else { return nil }
 
