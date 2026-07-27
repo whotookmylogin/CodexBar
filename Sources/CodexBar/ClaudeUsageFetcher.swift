@@ -26,7 +26,7 @@ enum ClaudeUsageFetcher {
         case 200:
             break
         case 401:
-            throw UsageError.unauthorized("Claude OAuth unauthorized. Run `claude login`.")
+            throw UsageError.unauthorized("Claude OAuth unauthorized. Run `claude auth login`.")
         case 429:
             throw UsageError.network("Claude OAuth rate limited. Wait a few minutes, then refresh.")
         default:
@@ -74,16 +74,34 @@ enum ClaudeUsageFetcher {
 
     private static func loadAccessToken(environment: [String: String]) throws -> String {
         let home = environment["HOME"] ?? NSHomeDirectory()
-        let path = (environment["CLAUDE_CREDENTIALS"] as String?)
-            ?? "\(home)/.claude/.credentials.json"
+        let path = environment["CLAUDE_CREDENTIALS"] ?? "\(home)/.claude/.credentials.json"
         let url = URL(fileURLWithPath: path)
-        guard let data = try? Data(contentsOf: url),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
-            throw UsageError.missingCredentials(
-                "Missing ~/.claude/.credentials.json. Run `claude login`.")
+
+        if let data = try? Data(contentsOf: url),
+           let token = extractToken(from: data)
+        {
+            return token
         }
 
+        // Claude Code on macOS often stores OAuth in Keychain only.
+        if let data = readKeychainCredentials(),
+           let token = extractToken(from: data)
+        {
+            try? FileManager.default.createDirectory(
+                at: URL(fileURLWithPath: home).appendingPathComponent(".claude"),
+                withIntermediateDirectories: true)
+            try? data.write(to: url, options: .atomic)
+            return token
+        }
+
+        throw UsageError.missingCredentials(
+            "Missing Claude OAuth credentials. Run `claude auth login` in Terminal.")
+    }
+
+    private static func extractToken(from data: Data) -> String? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
         if let oauth = root["claudeAiOauth"] as? [String: Any] {
             if let token = stringValue(oauth["accessToken"]) ?? stringValue(oauth["access_token"]),
                !token.isEmpty
@@ -91,20 +109,62 @@ enum ClaudeUsageFetcher {
                 return token
             }
         }
-
         if let token = stringValue(root["accessToken"]) ?? stringValue(root["access_token"]),
            !token.isEmpty
         {
             return token
         }
+        return nil
+    }
 
-        if root["mcpOAuth"] != nil {
-            throw UsageError.missingCredentials(
-                "Claude credentials are MCP-only. Re-run `claude login` for usage OAuth.")
+    private static func readKeychainCredentials() -> Data? {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        proc.arguments = [
+            "find-generic-password",
+            "-a", NSUserName(),
+            "-s", "Claude Code-credentials",
+            "-w",
+        ]
+        let out = Pipe()
+        let err = Pipe()
+        proc.standardOutput = out
+        proc.standardError = err
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+        } catch {
+            return nil
+        }
+        guard proc.terminationStatus == 0 else { return nil }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        guard let raw = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty
+        else { return nil }
+
+        if raw.hasPrefix("{") {
+            return raw.data(using: .utf8)
         }
 
-        throw UsageError.missingCredentials(
-            "No Claude OAuth access token found in credentials file.")
+        let hex = raw.replacingOccurrences(of: " ", with: "")
+        let hexSet = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
+        if hex.count % 2 == 0, hex.unicodeScalars.allSatisfy({ hexSet.contains($0) }) {
+            var bytes = [UInt8]()
+            bytes.reserveCapacity(hex.count / 2)
+            var idx = hex.startIndex
+            while idx < hex.endIndex {
+                let next = hex.index(idx, offsetBy: 2)
+                if let b = UInt8(hex[idx..<next], radix: 16) {
+                    bytes.append(b)
+                } else {
+                    return raw.data(using: .utf8)
+                }
+                idx = next
+            }
+            return Data(bytes)
+        }
+        return raw.data(using: .utf8)
     }
 
     private static func stringValue(_ any: Any?) -> String? {
@@ -112,6 +172,7 @@ enum ClaudeUsageFetcher {
             let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
             return t.isEmpty ? nil : t
         }
+        if let n = any as? NSNumber { return n.stringValue }
         return nil
     }
 }

@@ -195,9 +195,15 @@ enum CodexUsageFetcher {
     private static func loadAccountInfo(codexHome: URL) -> (email: String?, plan: String?) {
         let authURL = codexHome.appendingPathComponent("auth.json")
         guard let data = try? Data(contentsOf: authURL),
-              let auth = try? JSONDecoder().decode(AuthFile.self, from: data),
-              let idToken = auth.tokens?.idToken,
-              let payload = parseJWT(idToken)
+              let auth = try? JSONDecoder().decode(AuthFile.self, from: data)
+        else {
+            return (nil, nil)
+        }
+
+        // Prefer access token (longer lived) then id token for plan/email claims.
+        let jwt = auth.tokens?.accessToken ?? auth.tokens?.idToken
+        guard let token = jwt,
+              let payload = parseJWT(token)
         else {
             return (nil, nil)
         }
@@ -273,8 +279,10 @@ private struct AuthFile: Decodable {
 
 private struct Tokens: Decodable {
     let idToken: String?
+    let accessToken: String?
 
     enum CodingKeys: String, CodingKey {
         case idToken = "id_token"
+        case accessToken = "access_token"
     }
 }
